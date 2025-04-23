@@ -11,7 +11,9 @@
 		<svg x="96px" y="30px">
 			<foreignObject width="64" height="64" v-if="imageUrl">
 				<div xmlns="http://www.w3.org/1999/xhtml">
-					<img :src="imageUrl" class="circle-image" />
+					<a :href="url" target="_brank">
+						<img :src="imageUrl" class="circle-image" />
+					</a>
 				</div>
 			</foreignObject>
 			<g v-else>
@@ -63,7 +65,8 @@ export default {
 	data() {
 		return {
 			id: this.getId('account-icon'),
-			imageUrl: null
+			imageUrl: null,
+			url:null
 		};
 	},
 	async mounted() {
@@ -88,13 +91,12 @@ export default {
 
 		const imageMeta = JSON.parse(metadata.data[0].metadataEntry.value);
 
-
-
-
-
 		if (metadata) {
 
 			this.imageUrl = imageMeta.imageUrl;
+
+			this.url = imageMeta.url
+
 
 		}
 	},
@@ -132,9 +134,9 @@ export default {
 }
 
 .circle-image {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  object-fit: cover;
+	width: 64px;
+	height: 64px;
+	border-radius: 50%;
+	object-fit: cover;
 }
 </style>
