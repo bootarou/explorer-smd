@@ -1,4 +1,4 @@
-# SIP-100: Account Icon Display Using Metadata
+# SIP-426: Account Icon Display Using Metadata
 
 ## Summary
 
@@ -25,9 +25,9 @@ By associating accounts with visual icons, the following benefits can be achieve
 ```json
 {
   "url": "https://example.com",
-  "name": "myname",
+  "name": "Myname",
   "imageUrl": "https://example.com/image.jpg",
-  "namespace": "my namespace"
+  "namespace": "My namespace"
 }
 ```
 

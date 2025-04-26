@@ -1,4 +1,4 @@
-# SIP-100: メタデータによるアカウントアイコン表示
+# SIP-426: メタデータによるアカウントアイコン表示
 
 ## 概要（Summary）
 この提案は、Symbol Explorer において、アカウントメタデータに保存された画像URLをもとにアカウントアイコンを表示できる新機能を導入するものです。
@@ -16,18 +16,19 @@
 ## 仕様（Specification）
 
 ### メタデータの使用（Metadata Usage）
-- 利用するメタデータキー: social_meta_data
+- 利用するメタデータキー: `social_meta_data`
 - 値：JSON
 
-JSON
+```JSON
 
 {"url":"https://example.com","name":"myname","imageUrl":"https://example.com/image.jpg","namespace":"my namespace"}
 
+```
 
 ### 表示ルール（Display Rules）
-- social_meta_data が存在し、かつ有効な画像URLであれば、その画像をアカウントアイコンとして表示します。
+- `social_meta_data` が存在し、かつ有効な画像URLであれば、その画像をアカウントアイコンとして表示します。
 - メタデータが存在しない、または無効な場合は、従来のSVGプレースホルダーアイコンを使用します。
-- 画像は丸型アイコンとして表示します（border-radius: 50% を適用）。
+- 画像は丸型アイコンとして表示します（`border-radius: 50%` を適用）。
 
 ### モデレーション（Moderation）
 - 不適切と思われるアイコンに対して、ユーザーが「非表示」ボタンをクリックして手動で隠すことができます。
@@ -36,7 +37,7 @@ JSON
 
 ### バリデーション（Validation）
 - 画像表示前に以下のバリデーションを行います：
-  - http:// または https:// で始まるか
+  - `http://` または `https://` で始まるか
   - 適切な長さと形式であるかを検証して、不正利用を防止する
 
 ## 根拠（Rationale）
@@ -45,7 +46,7 @@ JSON
 
 ## 後方互換性（Backwards Compatibility）
 この提案は、既存機能を壊すことはありません。  
-social_meta_data が設定されていないアカウントは、従来通りデフォルトのアイコンが表示されます。
+`social_meta_data` が設定されていないアカウントは、従来通りデフォルトのアイコンが表示されます。
 
 ## 実装上の注意点（Implementation Notes）
 - メタデータは非同期で取得し、初回ページロードをブロックしないようにする
