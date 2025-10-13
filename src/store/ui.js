@@ -94,9 +94,17 @@ export default {
 				let value = payload.param;
 
 				if (null != value)
-					router.push({ path: `/${pageName}/${value}` });
+					router.push({ path: `/${pageName}/${value}` }).catch(err => {
+						if (err.name !== 'NavigationDuplicated') {
+							throw err;
+						}
+					});
 				else
-					router.push({ path: `/${pageName}` });
+					router.push({ path: `/${pageName}` }).catch(err => {
+						if (err.name !== 'NavigationDuplicated') {
+							throw err;
+						}
+					});
 			}
 		},
 

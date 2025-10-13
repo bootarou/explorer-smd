@@ -9,11 +9,26 @@
 		}}</text>
 
 		<svg x="96px" y="30px">
-			<foreignObject width="64" height="64" v-if="imageUrl">
-				<div xmlns="http://www.w3.org/1999/xhtml">
-					<a :href="url" target="_brank">
-						<img :src="imageUrl" class="circle-image" />
+			<foreignObject width="64" height="64" v-if="imageUrl && !isHidden">
+				<div xmlns="http://www.w3.org/1999/xhtml" class="icon-container">
+					<a :href="url" target="_blank">
+						<img 
+							:src="imageUrl" 
+							class="circle-image" 
+							@error="handleImageError"
+							@load="handleImageLoad"
+							loading="lazy"
+							:alt="`Account icon for ${address}`"
+						/>
 					</a>
+					<button 
+						class="hide-icon-btn" 
+						@click.stop="hideIcon"
+						title="Hide inappropriate icon"
+						:aria-label="`Hide icon for ${address}`"
+					>
+						✕
+					</button>
 				</div>
 			</foreignObject>
 			<g v-else>
@@ -26,6 +41,18 @@
 				<path
 					d="M32.5 60.125C16.967 60.125 4.375 47.533 4.375 32H0.625C0.625 49.6041 14.8959 63.875 32.5 63.875V60.125ZM60.625 32C60.625 47.533 48.033 60.125 32.5 60.125V63.875C50.1041 63.875 64.375 49.6041 64.375 32H60.625ZM32.5 3.875C48.033 3.875 60.625 16.467 60.625 32H64.375C64.375 14.3959 50.1041 0.125 32.5 0.125V3.875ZM32.5 0.125C14.8959 0.125 0.625 14.3959 0.625 32H4.375C4.375 16.467 16.967 3.875 32.5 3.875V0.125Z"
 					:fill="iconColor" />
+				<!-- Show unhide button for hidden icons -->
+				<foreignObject v-if="isHidden && imageUrl" x="22" y="22" width="20" height="20">
+					<div xmlns="http://www.w3.org/1999/xhtml">
+						<button 
+							class="unhide-icon-btn"
+							@click.stop="unhideIcon"
+							title="Show icon"
+						>
+							👁️
+						</button>
+					</div>
+				</foreignObject>
 			</g>
 		</svg>
 	</svg>
@@ -66,38 +93,186 @@ export default {
 		return {
 			id: this.getId('account-icon'),
 			imageUrl: null,
-			url:null
+			url: null,
+			isHidden: false,
+			hiddenIconsKey: 'hiddenAccountIcons',
+			isLoading: false,
+			hasError: false
 		};
 	},
 	async mounted() {
+		await this.loadAccountIcon();
+		this.checkIfHidden();
+	},
 
-		const nodeUrl = Http.nodeUrl;
-		const repoFactory = new RepositoryFactoryHttp(nodeUrl);
-		const metadataRepo = repoFactory.createMetadataRepository();
-		const accountRepo = repoFactory.createAccountRepository();
-		const addressObj = Address.createFromRawAddress(this.address);
+	watch: {
+		address() {
+			this.loadAccountIcon();
+			this.checkIfHidden();
+		}
+	},
 
-		const key = "D6FBBD8C20F5AC1C";//social_meta_data
+	methods: {
+		async loadAccountIcon() {
+			if (this.isLoading) return; // 重複ロードを防ぐ
+			
+			this.isLoading = true;
+			this.hasError = false;
+			
+			try {
+				const nodeUrl = Http.nodeUrl;
+				const repoFactory = new RepositoryFactoryHttp(nodeUrl);
+				const metadataRepo = repoFactory.createMetadataRepository();
+				const addressObj = Address.createFromRawAddress(this.address);
 
-		const searchCriteria = {
-			targetAddress: addressObj,
-			metadataType: MetadataType.Account,
-			scopedMetadataKey: key
-		};
+				const key = "D6FBBD8C20F5AC1C";//social_meta_data
 
-		const metadata = await metadataRepo.search(searchCriteria).toPromise();
+				const searchCriteria = {
+					targetAddress: addressObj,
+					metadataType: MetadataType.Account,
+					scopedMetadataKey: key
+				};
 
-		console.log(metadata);
+				const metadata = await metadataRepo.search(searchCriteria).toPromise();
 
-		const imageMeta = JSON.parse(metadata.data[0].metadataEntry.value);
+				if (metadata && metadata.data && metadata.data.length > 0) {
+					const imageMeta = JSON.parse(metadata.data[0].metadataEntry.value);
+					
+					// バリデーション実行
+					if (this.validateImageUrl(imageMeta.imageUrl)) {
+						this.imageUrl = imageMeta.imageUrl;
+						this.url = imageMeta.url;
+					} else {
+						console.warn('Invalid image URL:', imageMeta.imageUrl);
+						this.imageUrl = null;
+						this.url = null;
+					}
+				}
+			} catch (error) {
+				console.warn('Failed to load account metadata:', error);
+				this.imageUrl = null;
+				this.url = null;
+				this.hasError = true;
+			} finally {
+				this.isLoading = false;
+			}
+		},
 
-		if (metadata) {
+		/**
+		 * 画像URLのバリデーション
+		 */
+		validateImageUrl(url) {
+			if (!url || typeof url !== 'string') {
+				return false;
+			}
 
-			this.imageUrl = imageMeta.imageUrl;
+			// URLの長さ制限
+			if (url.length > 2048) {
+				console.warn('URL too long:', url.length);
+				return false;
+			}
 
-			this.url = imageMeta.url
+			// http/https プロトコルのチェック
+			if (!url.startsWith('http://') && !url.startsWith('https://')) {
+				console.warn('Invalid protocol in URL:', url);
+				return false;
+			}
 
+			// 基本的なURL形式のチェック
+			try {
+				new URL(url);
+				return true;
+			} catch (error) {
+				console.warn('Invalid URL format:', url, error);
+				return false;
+			}
+		},
 
+		/**
+		 * アイコンが非表示設定されているかチェック
+		 */
+		checkIfHidden() {
+			if (!this.address) return;
+			
+			const hiddenIcons = this.getHiddenIcons();
+			this.isHidden = hiddenIcons.includes(this.address);
+		},
+
+		/**
+		 * LocalStorageから非表示リストを取得
+		 */
+		getHiddenIcons() {
+			try {
+				const stored = localStorage.getItem(this.hiddenIconsKey);
+				return stored ? JSON.parse(stored) : [];
+			} catch (error) {
+				console.error('Error reading hidden icons from localStorage:', error);
+				return [];
+			}
+		},
+
+		/**
+		 * LocalStorageに非表示リストを保存
+		 */
+		setHiddenIcons(hiddenList) {
+			try {
+				localStorage.setItem(this.hiddenIconsKey, JSON.stringify(hiddenList));
+			} catch (error) {
+				console.error('Error saving hidden icons to localStorage:', error);
+			}
+		},
+
+		/**
+		 * アイコンを非表示にする
+		 */
+		hideIcon() {
+			if (!this.address) return;
+			
+			const hiddenIcons = this.getHiddenIcons();
+			if (!hiddenIcons.includes(this.address)) {
+				hiddenIcons.push(this.address);
+				this.setHiddenIcons(hiddenIcons);
+				this.isHidden = true;
+				
+				console.log('Icon hidden for address:', this.address);
+				this.$emit('icon-hidden', this.address);
+			}
+		},
+
+		/**
+		 * アイコンの非表示を解除する
+		 */
+		unhideIcon() {
+			if (!this.address) return;
+			
+			const hiddenIcons = this.getHiddenIcons();
+			const index = hiddenIcons.indexOf(this.address);
+			if (index > -1) {
+				hiddenIcons.splice(index, 1);
+				this.setHiddenIcons(hiddenIcons);
+				this.isHidden = false;
+				
+				console.log('Icon shown for address:', this.address);
+				this.$emit('icon-shown', this.address);
+			}
+		},
+
+		/**
+		 * 画像読み込み成功処理
+		 */
+		handleImageLoad() {
+			this.isLoading = false;
+			this.hasError = false;
+		},
+
+		/**
+		 * 画像読み込みエラー処理
+		 */
+		handleImageError() {
+			console.warn('Failed to load account icon:', this.imageUrl);
+			this.imageUrl = null;
+			this.isLoading = false;
+			this.hasError = true;
 		}
 	},
 	computed: {
@@ -138,5 +313,101 @@ export default {
 	height: 64px;
 	border-radius: 50%;
 	object-fit: cover;
+}
+
+.icon-container {
+	position: relative;
+	display: inline-block;
+}
+
+/* モデレーションボタン */
+.hide-icon-btn {
+	position: absolute;
+	top: -3px;
+	right: -3px;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: rgba(255, 0, 0, 0.9);
+	color: white;
+	border: none;
+	font-size: 12px;
+	line-height: 1;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.icon-container:hover .hide-icon-btn {
+	opacity: 1;
+}
+
+/* 非表示解除ボタン */
+.unhide-icon-btn {
+	width: 20px;
+	height: 20px;
+	background: rgba(0, 123, 255, 0.8);
+	color: white;
+	border: none;
+	border-radius: 50%;
+	cursor: pointer;
+	font-size: 10px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: background 0.2s ease;
+}
+
+.unhide-icon-btn:hover {
+	background: rgba(0, 123, 255, 1);
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+	.hide-icon-btn {
+		width: 20px;
+		height: 20px;
+		font-size: 14px;
+		opacity: 1; /* モバイルでは常に表示 */
+	}
+	
+	.icon-container {
+		/* モバイルでのタッチ操作を考慮 */
+		-webkit-tap-highlight-color: transparent;
+	}
+	
+	.circle-image {
+		width: 48px;
+		height: 48px;
+	}
+}
+
+@media (max-width: 480px) {
+	.circle-image {
+		width: 40px;
+		height: 40px;
+	}
+	
+	.hide-icon-btn {
+		width: 16px;
+		height: 16px;
+		font-size: 12px;
+	}
+}
+
+/* パフォーマンス最適化 */
+.circle-image {
+	/* GPU加速を有効にしてスムーズなトランジション */
+	will-change: opacity;
+	transform: translateZ(0);
+}
+
+.icon-container {
+	/* ハードウェア加速を有効化 */
+	transform: translateZ(0);
 }
 </style>

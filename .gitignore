@@ -27,3 +27,6 @@ src/config/setup.json
 
 # e2e screenshots
 e2e/screenshots/*
+package-lock.json
+webpack.config.js.backup
+package.json
