@@ -19,8 +19,11 @@
 							@load="handleImageLoad"
 							loading="lazy"
 							:alt="`Account icon for ${address}`"
+							:class="{ 'loading': isLoading }"
 						/>
 					</a>
+					<!-- Loading indicator -->
+					<div v-if="isLoading" class="loading-spinner"></div>
 					<button 
 						class="hide-icon-btn" 
 						@click.stop="hideIcon"
@@ -64,6 +67,176 @@ import GraphicComponent from './GraphicComponent.vue';
 import Http from '@/infrastructure/http'
 import { Address, RepositoryFactoryHttp, MetadataType, UInt64 } from 'symbol-sdk'
 
+// グローバルキャッシュマネージャー
+class ImageCacheManager {
+	constructor() {
+		this.memoryCache = new Map();
+		this.localStorageKey = 'accountIconCache';
+		this.maxCacheSize = 100; // メモリキャッシュの最大サイズ
+		this.cacheExpiry = 24 * 60 * 60 * 1000; // 24時間のキャッシュ有効期限
+	}
+
+	// キャッシュキーを生成
+	generateCacheKey(address, imageUrl) {
+		return `${address}_${this.hashString(imageUrl)}`;
+	}
+
+	// 簡単なハッシュ関数
+	hashString(str) {
+		let hash = 0;
+		for (let i = 0; i < str.length; i++) {
+			const char = str.charCodeAt(i);
+			hash = ((hash << 5) - hash) + char;
+			hash = hash & hash; // 32bit整数に変換
+		}
+		return Math.abs(hash).toString(36);
+	}
+
+	// メモリキャッシュから取得
+	getFromMemory(cacheKey) {
+		const cached = this.memoryCache.get(cacheKey);
+		if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+			return cached.data;
+		}
+		this.memoryCache.delete(cacheKey);
+		return null;
+	}
+
+	// メモリキャッシュに保存
+	setToMemory(cacheKey, data) {
+		// キャッシュサイズ制限
+		if (this.memoryCache.size >= this.maxCacheSize) {
+			const firstKey = this.memoryCache.keys().next().value;
+			this.memoryCache.delete(firstKey);
+		}
+
+		this.memoryCache.set(cacheKey, {
+			data,
+			timestamp: Date.now()
+		});
+	}
+
+	// LocalStorageから取得
+	getFromLocalStorage(cacheKey) {
+		try {
+			const allCache = JSON.parse(localStorage.getItem(this.localStorageKey) || '{}');
+			const cached = allCache[cacheKey];
+			
+			if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+				return cached.data;
+			}
+			
+			// 期限切れのキャッシュを削除
+			if (cached) {
+				delete allCache[cacheKey];
+				localStorage.setItem(this.localStorageKey, JSON.stringify(allCache));
+			}
+			
+			return null;
+		} catch (error) {
+			console.warn('Failed to read from localStorage cache:', error);
+			return null;
+		}
+	}
+
+	// LocalStorageに保存
+	setToLocalStorage(cacheKey, data) {
+		try {
+			const allCache = JSON.parse(localStorage.getItem(this.localStorageKey) || '{}');
+			
+			// キャッシュサイズ制限（LocalStorage用）
+			const cacheKeys = Object.keys(allCache);
+			if (cacheKeys.length >= 50) {
+				// 古いキャッシュを削除
+				const oldestKey = cacheKeys.reduce((oldest, key) => {
+					return allCache[key].timestamp < allCache[oldest].timestamp ? key : oldest;
+				});
+				delete allCache[oldestKey];
+			}
+
+			allCache[cacheKey] = {
+				data,
+				timestamp: Date.now()
+			};
+
+			localStorage.setItem(this.localStorageKey, JSON.stringify(allCache));
+		} catch (error) {
+			console.warn('Failed to save to localStorage cache:', error);
+		}
+	}
+
+	// キャッシュから取得（メモリ -> localStorage の順）
+	get(cacheKey) {
+		// まずメモリキャッシュから
+		let cached = this.getFromMemory(cacheKey);
+		if (cached) {
+			return cached;
+		}
+
+		// LocalStorageから取得してメモリキャッシュに保存
+		cached = this.getFromLocalStorage(cacheKey);
+		if (cached) {
+			this.setToMemory(cacheKey, cached);
+			return cached;
+		}
+
+		return null;
+	}
+
+	// キャッシュに保存（メモリ と localStorage 両方）
+	set(cacheKey, data) {
+		this.setToMemory(cacheKey, data);
+		this.setToLocalStorage(cacheKey, data);
+	}
+
+	// 期限切れキャッシュをクリーンアップ
+	cleanup() {
+		// メモリキャッシュのクリーンアップ
+		for (const [key, value] of this.memoryCache.entries()) {
+			if (Date.now() - value.timestamp >= this.cacheExpiry) {
+				this.memoryCache.delete(key);
+			}
+		}
+
+		// LocalStorageのクリーンアップ
+		try {
+			const allCache = JSON.parse(localStorage.getItem(this.localStorageKey) || '{}');
+			let hasChanged = false;
+
+			for (const key of Object.keys(allCache)) {
+				if (Date.now() - allCache[key].timestamp >= this.cacheExpiry) {
+					delete allCache[key];
+					hasChanged = true;
+				}
+			}
+
+			if (hasChanged) {
+				localStorage.setItem(this.localStorageKey, JSON.stringify(allCache));
+			}
+		} catch (error) {
+			console.warn('Failed to cleanup localStorage cache:', error);
+		}
+	}
+
+	// キャッシュをクリア
+	clear() {
+		this.memoryCache.clear();
+		try {
+			localStorage.removeItem(this.localStorageKey);
+		} catch (error) {
+			console.warn('Failed to clear localStorage cache:', error);
+		}
+	}
+}
+
+// グローバルキャッシュインスタンス
+const imageCache = new ImageCacheManager();
+
+// 定期的なクリーンアップ（10分ごと）
+setInterval(() => {
+	imageCache.cleanup();
+}, 10 * 60 * 1000);
+
 export default {
 	extends: GraphicComponent,
 
@@ -97,7 +270,8 @@ export default {
 			isHidden: false,
 			hiddenIconsKey: 'hiddenAccountIcons',
 			isLoading: false,
-			hasError: false
+			hasError: false,
+			cacheKey: null
 		};
 	},
 	async mounted() {
@@ -120,6 +294,18 @@ export default {
 			this.hasError = false;
 			
 			try {
+				// まずキャッシュから確認
+				const tempCacheKey = `metadata_${this.address}`;
+				const cachedMetadata = imageCache.get(tempCacheKey);
+				
+				if (cachedMetadata) {
+					console.log('Using cached metadata for:', this.address);
+					this.setImageFromMetadata(cachedMetadata);
+					this.isLoading = false;
+					return;
+				}
+
+				// キャッシュにない場合、APIから取得
 				const nodeUrl = Http.nodeUrl;
 				const repoFactory = new RepositoryFactoryHttp(nodeUrl);
 				const metadataRepo = repoFactory.createMetadataRepository();
@@ -138,15 +324,15 @@ export default {
 				if (metadata && metadata.data && metadata.data.length > 0) {
 					const imageMeta = JSON.parse(metadata.data[0].metadataEntry.value);
 					
-					// バリデーション実行
-					if (this.validateImageUrl(imageMeta.imageUrl)) {
-						this.imageUrl = imageMeta.imageUrl;
-						this.url = imageMeta.url;
-					} else {
-						console.warn('Invalid image URL:', imageMeta.imageUrl);
-						this.imageUrl = null;
-						this.url = null;
-					}
+					// メタデータをキャッシュに保存
+					imageCache.set(tempCacheKey, imageMeta);
+					
+					this.setImageFromMetadata(imageMeta);
+				} else {
+					// メタデータなしもキャッシュ（空のオブジェクト）
+					imageCache.set(tempCacheKey, {});
+					this.imageUrl = null;
+					this.url = null;
 				}
 			} catch (error) {
 				console.warn('Failed to load account metadata:', error);
@@ -156,6 +342,51 @@ export default {
 			} finally {
 				this.isLoading = false;
 			}
+		},
+
+		setImageFromMetadata(imageMeta) {
+			if (imageMeta.imageUrl && this.validateImageUrl(imageMeta.imageUrl)) {
+				// 画像キャッシュのキーを生成
+				this.cacheKey = imageCache.generateCacheKey(this.address, imageMeta.imageUrl);
+				
+				// 画像キャッシュから確認
+				const cachedImage = imageCache.get(this.cacheKey);
+				if (cachedImage && cachedImage.imageUrl) {
+					console.log('Using cached image for:', this.address);
+					this.imageUrl = cachedImage.imageUrl;
+					this.url = cachedImage.url;
+					return;
+				}
+
+				// キャッシュにない場合、画像をプリロード
+				this.preloadImage(imageMeta.imageUrl).then(() => {
+					this.imageUrl = imageMeta.imageUrl;
+					this.url = imageMeta.url;
+					
+					// 成功した画像をキャッシュに保存
+					imageCache.set(this.cacheKey, {
+						imageUrl: imageMeta.imageUrl,
+						url: imageMeta.url
+					});
+				}).catch(() => {
+					console.warn('Failed to preload image:', imageMeta.imageUrl);
+					this.imageUrl = null;
+					this.url = null;
+				});
+			} else {
+				this.imageUrl = null;
+				this.url = null;
+			}
+		},
+
+		// 画像をプリロードして読み込み可能性を確認
+		preloadImage(imageUrl) {
+			return new Promise((resolve, reject) => {
+				const img = new Image();
+				img.onload = () => resolve();
+				img.onerror = () => reject();
+				img.src = imageUrl;
+			});
 		},
 
 		/**
@@ -270,6 +501,12 @@ export default {
 		 */
 		handleImageError() {
 			console.warn('Failed to load account icon:', this.imageUrl);
+			
+			// エラーになった画像のキャッシュを削除
+			if (this.cacheKey) {
+				imageCache.memoryCache.delete(this.cacheKey);
+			}
+			
 			this.imageUrl = null;
 			this.isLoading = false;
 			this.hasError = true;
@@ -293,6 +530,12 @@ export default {
 				? '95 30 70 65'
 				: '0 0 261.333 131.313';
 		}
+	},
+
+	// コンポーネント破棄時のクリーンアップ
+	beforeDestroy() {
+		// 必要に応じて特定のキャッシュをクリア
+		// imageCache.memoryCache.delete(this.cacheKey);
 	}
 };
 </script>
@@ -313,11 +556,36 @@ export default {
 	height: 64px;
 	border-radius: 50%;
 	object-fit: cover;
+	transition: opacity 0.3s ease;
+}
+
+.circle-image.loading {
+	opacity: 0.7;
 }
 
 .icon-container {
 	position: relative;
 	display: inline-block;
+}
+
+/* ローディングスピナー */
+.loading-spinner {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 20px;
+	height: 20px;
+	border: 2px solid #f3f3f3;
+	border-top: 2px solid #3498db;
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+	z-index: 5;
+}
+
+@keyframes spin {
+	0% { transform: translate(-50%, -50%) rotate(0deg); }
+	100% { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
 /* モデレーションボタン */
