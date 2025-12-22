@@ -3,9 +3,9 @@ const webpack = require('webpack');
 
 module.exports = {
 	// base url
-	publicPath: '/',
+	publicPath: '/explorer-smd/',
 	// output dir
-	outputDir: './www',
+	outputDir: './dist',
 	// eslint-loader check
 	lintOnSave: true,
 	// webpack-dev-server
