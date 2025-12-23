@@ -3,7 +3,9 @@ const webpack = require('webpack');
 
 module.exports = {
 	// base url
-	publicPath: '/explorer-smd/',
+	publicPath: process.env.NODE_ENV === 'production'
+		? '/explorer-smd/'
+		: '/',
 	// output dir
 	outputDir: './dist',
 	// eslint-loader check
