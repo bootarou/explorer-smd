@@ -17,7 +17,7 @@
             {
                 "layoutOptions": "full-width",
                 "type": "SocialMetadataWidget",
-                "title": "socialMetadataTitle"
+                "title": "socialMetadata"
             }
         ]
     }

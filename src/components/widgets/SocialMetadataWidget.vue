@@ -1,7 +1,7 @@
 <template>
 	<Card>
 		<template #title>
-			{{ title }}
+			{{ widgetTitle }}
 		</template>
 		<template #body>
 			<div class="smd-widget">
@@ -14,31 +14,49 @@
 						<p>{{ getNameByKey('noDataFound') || 'No social metadata found' }}</p>
 					</div>
 
-					<div v-else class="smd-grid">
-						<div 
-							v-for="(item, index) in socialMetadata" 
-							:key="index"
-							class="smd-card"
-							@click="openUrl(item.url)"
-						>
-							<div class="smd-card-image">
-								<img 
-									v-if="item.imageUrl && !getImageErrorStatus(item.id)" 
-									:src="item.imageUrl" 
-									:alt="item.name"
-									@error="handleImageError($event, item.id)"
-									@load="handleImageLoad(item.id)"
-								>
-								<div v-else class="placeholder-image">
-									<img :src="accountIcon" :alt="item.name || 'Account'" class="account-icon">
+					<div v-else>
+						<!-- Sort Controls -->
+						<div class="sort-controls">
+							<label for="sortSelect">{{ getNameByKey('sortBy') || 'Sort by' }}:</label>
+							<select id="sortSelect" v-model="sortBy" @change="applySorting" class="sort-select">
+								<option value="default">{{ getNameByKey('sortDefault') || 'Default' }}</option>
+								<option value="name">{{ getNameByKey('sortName') || 'Name' }}</option>
+								<option value="namespace">{{ getNameByKey('sortNamespace') || 'Namespace' }}</option>
+								<option value="url">{{ getNameByKey('sortUrl') || 'URL' }}</option>
+							</select>
+							<button @click="toggleSortOrder" class="sort-order-btn" :title="sortOrder === 'asc' ? (getNameByKey('sortAscending') || 'Ascending') : (getNameByKey('sortDescending') || 'Descending')">
+								{{ sortOrder === 'asc' ? '↑' : '↓' }}
+							</button>
+						</div>
+
+						<div class="smd-grid">
+							<div 
+								v-for="(item, index) in sortedSocialMetadata" 
+								:key="index"
+								class="smd-card"
+							>
+								<div class="smd-card-image">
+									<img 
+										v-if="item.imageUrl && !getImageErrorStatus(item.id)" 
+										:src="item.imageUrl" 
+										:alt="item.name"
+										@error="handleImageError($event, item.id)"
+										@load="handleImageLoad(item.id)"
+									>
+									<div v-else class="placeholder-image">
+										<img :src="accountIcon" :alt="item.name || 'Account'" class="account-icon">
+									</div>
 								</div>
-							</div>
-							<div class="smd-card-content">
-								<h5 class="smd-card-title">{{ item.name || 'Unnamed' }}</h5>
-								<p class="smd-card-url">{{ item.url || 'No URL' }}</p>
-								<p v-if="item.namespace" class="smd-card-namespace">
-									Namespace: {{ item.namespace }}
-								</p>
+								<div class="smd-card-content">
+									<h5 class="smd-card-title">{{ item.name || 'Unnamed' }}</h5>
+									<p class="smd-card-url" @click="openUrl(item.url)">{{ item.url || 'No URL' }}</p>
+									<p v-if="item.targetAddress" class="smd-card-address" @click="openAccountPage(item.targetAddress)">
+										{{ item.targetAddress }}
+									</p>
+									<p v-if="item.namespace" class="smd-card-namespace" @click="openNamespacePage(item.namespace)">
+										Namespace: {{ item.namespace }}
+									</p>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -63,20 +81,26 @@ export default {
 	props: {
 		title: {
 			type: String,
-			default: 'Social Metadata'
+			default: null // computedで動的に設定
 		}
 	},
 
 	data() {
 		return {
 			imageErrors: [], // 画像読み込みエラーを追跡
-			accountIcon: IconAccounts // アカウントアイコン
+			accountIcon: IconAccounts, // アカウントアイコン
+			sortBy: 'default', // 並び替え基準
+			sortOrder: 'asc' // 並び替え順序 (asc/desc)
 		};
 	},
 
 	computed: {
 		getNameByKey() {
 			return this.$store.getters['ui/getNameByKey'];
+		},
+
+		widgetTitle() {
+			return this.title || this.getNameByKey('socialMetadataTitle') || 'Social Metadata';
 		},
 		
 		socialMetadata() {
@@ -85,6 +109,38 @@ export default {
 		
 		loading() {
 			return this.$store.getters['socialMetadata/isLoading'];
+		},
+
+		sortedSocialMetadata() {
+			const data = [...this.socialMetadata];
+			
+			if (this.sortBy === 'default') {
+				return data; // 元の順序を維持
+			}
+
+			return data.sort((a, b) => {
+				let valueA, valueB;
+				
+				switch (this.sortBy) {
+					case 'name':
+						valueA = (a.name || '').toLowerCase();
+						valueB = (b.name || '').toLowerCase();
+						break;
+					case 'namespace':
+						valueA = (a.namespace || '').toLowerCase();
+						valueB = (b.namespace || '').toLowerCase();
+						break;
+					case 'url':
+						valueA = (a.url || '').toLowerCase();
+						valueB = (b.url || '').toLowerCase();
+						break;
+					default:
+						return 0;
+				}
+
+				let result = valueA.localeCompare(valueB);
+				return this.sortOrder === 'desc' ? -result : result;
+			});
 		}
 	},
 
@@ -118,6 +174,27 @@ export default {
 			if (url) {
 				window.open(url, '_blank');
 			}
+		},
+
+		openAccountPage(targetAddress) {
+			if (targetAddress) {
+				this.$router.push(`/accounts/${targetAddress}`);
+			}
+		},
+
+		openNamespacePage(namespace) {
+			if (namespace) {
+				this.$router.push(`/namespaces/${namespace}`);
+			}
+		},
+
+		applySorting() {
+			// Sort is automatically applied via computed property
+			console.log('Sorting by:', this.sortBy, 'Order:', this.sortOrder);
+		},
+
+		toggleSortOrder() {
+			this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
 		},
 
 		handleImageError(event, itemId) {
@@ -158,6 +235,49 @@ export default {
 	text-align: center;
 	padding: 40px 0;
 	color: var(--secondary-text);
+}
+
+.sort-controls {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 20px;
+	padding: 10px;
+	background-color: var(--card-bg);
+	border-radius: 8px;
+	border: 1px solid var(--card-border);
+}
+
+.sort-controls label {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--primary-text);
+}
+
+.sort-select {
+	padding: 6px 12px;
+	border: 1px solid var(--card-border);
+	border-radius: 4px;
+	background-color: var(--card-bg);
+	color: var(--primary-text);
+	font-size: 14px;
+	cursor: pointer;
+}
+
+.sort-order-btn {
+	padding: 6px 10px;
+	border: 1px solid var(--card-border);
+	border-radius: 4px;
+	background-color: var(--primary);
+	color: white;
+	font-size: 16px;
+	font-weight: bold;
+	cursor: pointer;
+	transition: background-color 0.2s ease;
+}
+
+.sort-order-btn:hover {
+	background-color: var(--primary-hover);
 }
 
 .smd-grid {
@@ -228,11 +348,42 @@ export default {
 	color: var(--link-text);
 	margin-bottom: 4px;
 	word-break: break-all;
+	cursor: pointer;
+	transition: color 0.2s ease;
+	
+	&:hover {
+		color: var(--primary);
+		text-decoration: underline;
+	}
+}
+
+.smd-card-address {
+	font-size: 12px;
+	color: var(--primary);
+	margin-bottom: 4px;
+	font-family: monospace;
+	font-weight: bold;
+	word-break: break-all;
+	cursor: pointer;
+	transition: color 0.2s ease;
+	
+	&:hover {
+		color: var(--primary-hover);
+		text-decoration: underline;
+	}
 }
 
 .smd-card-namespace {
 	font-size: 12px;
-	color: var(--secondary-text);
+	color: var(--primary);
+	font-weight: bold;
 	margin: 0;
+	cursor: pointer;
+	transition: color 0.2s ease;
+	
+	&:hover {
+		color: var(--primary-hover);
+		text-decoration: underline;
+	}
 }
 </style>

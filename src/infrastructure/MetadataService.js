@@ -18,7 +18,7 @@
 
 import http from './http';
 import Constants from '../config/constants';
-import { Convert } from 'symbol-sdk';
+import { Convert, Address } from 'symbol-sdk';
 
 class MetadataService {
 	/**
@@ -148,7 +148,7 @@ class MetadataService {
 				// Get the hex encoded value
 				const hexValue = metadata.metadataEntry.value;
 				console.log('Processing hex value:', hexValue.substring(0, 100));
-				
+			
 				// Decode hex to UTF-8 string using Symbol SDK
 				const jsonString = MetadataService.hexToUtf8(hexValue);
 				console.log('Decoded string:', jsonString.substring(0, 100));
@@ -169,6 +169,30 @@ class MetadataService {
 				// Validate required fields and skip empty entries
 				if (socialData.url && socialData.name && 
 					socialData.url.trim() !== '' && socialData.name.trim() !== '') {
+					
+					// Convert target address to proper format
+					let formattedTargetAddress = metadata.metadataEntry.targetAddress;
+					try {
+						// If targetAddress is an Address object, convert to plain format
+						if (typeof formattedTargetAddress === 'object' && formattedTargetAddress.plain) {
+							formattedTargetAddress = formattedTargetAddress.plain();
+						} else if (typeof formattedTargetAddress === 'string') {
+							// Check if it's a HEX string (64 characters, no hyphens)
+							if (formattedTargetAddress.length === 48 && /^[0-9A-Fa-f]+$/.test(formattedTargetAddress)) {
+								// It's a HEX address, convert using createFromEncoded
+								formattedTargetAddress = Address.createFromEncoded(formattedTargetAddress).plain();
+							} else {
+								// It's already a formatted address, try createFromRawAddress
+								formattedTargetAddress = Address.createFromRawAddress(formattedTargetAddress).plain();
+							}
+						}
+						console.log('Target address conversion:', metadata.metadataEntry.targetAddress, '->', formattedTargetAddress);
+					} catch (addressError) {
+						console.warn('Failed to convert target address:', addressError);
+						// Use original value if conversion fails
+						formattedTargetAddress = metadata.metadataEntry.targetAddress;
+					}
+
 					parsed.push({
 						id: `smd-${index}`,
 						url: socialData.url,
@@ -176,7 +200,7 @@ class MetadataService {
 						imageUrl: socialData.imageUrl || '',
 						namespace: socialData.namespace || '',
 						sourceAddress: metadata.metadataEntry.sourceAddress,
-						targetAddress: metadata.metadataEntry.targetAddress
+						targetAddress: formattedTargetAddress
 					});
 				}
 			} catch (error) {

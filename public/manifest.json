@@ -1,6 +1,6 @@
 {
- "name": "Symbol Block Explorer",
- "short_name": "Symbol Block Explorer",
+ "name": "NFTDrive-BlockChainExplorer-SMD",
+ "short_name": "NFTDriveExplorer-SMD",
  "icons": [
         {
             "src": "icons/android-chrome-192x192.png",
