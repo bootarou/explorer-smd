@@ -93,6 +93,25 @@
                     "receiptType",
                     "mosaicArtifactId"
 				]
+			},
+			{
+				"layoutOptions": "full-width",
+				"type": "CardTable",
+				"title": "mosaicTransactionsTitle",
+				"managerGetter": "mosaic/transactions",
+				"pagination": "server",
+				"hasFilter": true,
+				"hideOnError": true,
+				"fields": [
+					"transactionHash",
+					"transactionType",
+					"height",
+					"age",
+					"signer",
+					"recipient",
+					"extendGraphicValue",
+					"effectiveFee"
+				]
 			}
         ]
     }

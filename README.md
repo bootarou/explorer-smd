@@ -19,6 +19,12 @@ This explorer includes enhanced **Social MetaData (SMD)** functionality:
 ### Standard Symbol Explorer Features
 The explorer supports searching for transactions, accounts, namespaces, mosaics, and blocks information on a given network.
 
+**Enhanced Mosaic Detail Page:**
+- View transaction history for specific mosaics
+- Paginated transaction list (10 transactions per page)
+- Filter transactions by mosaic ID using `transferMosaicId` parameter
+- Display transaction details including hash, type, height, age, signer, recipient, and fees
+
 ## Requirements
 
 - Node.js v20
@@ -63,6 +69,13 @@ npm run dev
 * **Multi-language support**: Japanese (ソーシャルメタデータ) and English translations
 * **Navigation integration**: Direct links to accounts and namespaces
 * **Sort functionality**: Multiple sorting options with ascending/descending order
+
+### Mosaic Transaction History
+
+* **MosaicService.getMosaicTransactionList**: Fetches mosaic-specific transactions using `transferMosaicId` parameter
+* **Pagination**: Server-side pagination with 10 transactions per page
+* **Transaction details**: Displays hash, type, height, timestamp, signer, recipient, and fees
+* **Integration**: Automatically loaded on mosaic detail pages with filter support
 
 ## Getting help
 
