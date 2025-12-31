@@ -20,9 +20,11 @@ This explorer includes enhanced **Social MetaData (SMD)** functionality:
 The explorer supports searching for transactions, accounts, namespaces, mosaics, and blocks information on a given network.
 
 **Enhanced Mosaic Detail Page:**
+- View mosaic holder list with balance information
 - View transaction history for specific mosaics
-- Paginated transaction list (10 transactions per page)
+- Paginated lists (10 items per page)
 - Filter transactions by mosaic ID using `transferMosaicId` parameter
+- Display holder balances with proper divisibility formatting
 - Display transaction details including hash, type, height, age, signer, recipient, and fees
 
 ## Requirements
@@ -69,6 +71,14 @@ npm run dev
 * **Multi-language support**: Japanese (ソーシャルメタデータ) and English translations
 * **Navigation integration**: Direct links to accounts and namespaces
 * **Sort functionality**: Multiple sorting options with ascending/descending order
+
+### Mosaic Holder List
+
+* **MosaicService.getMosaicHolderList**: Fetches accounts holding specific mosaic using `mosaicId` parameter
+* **Pagination**: Server-side pagination with 10 holders per page
+* **Balance calculation**: Displays mosaic balance for each holder with proper divisibility
+* **Account details**: Shows address, balance, importance, alias names, and labels
+* **Integration**: Automatically loaded on mosaic detail pages
 
 ### Mosaic Transaction History
 

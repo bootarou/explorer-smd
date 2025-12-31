@@ -132,6 +132,7 @@
     "blockDetailTitle": "Block Detail",
     "blockTransactionsTitle": "Block Transactions",
     "mosaicDetailTitle": "Mosaic Detail",
+    "mosaicHoldersTitle": "Mosaic Holders",
     "mosaicTransactionsTitle": "Mosaic Transactions",
     "namespaceDetailTitle": "Namespace Detail",
     "namespaceLevelTitle": "Namespace Level",

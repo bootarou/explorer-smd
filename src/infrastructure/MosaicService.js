@@ -20,6 +20,7 @@ import http from './http';
 import { Constants } from '../config';
 import helper from '../helper';
 import {
+	AccountService,
 	MetadataService,
 	NamespaceService,
 	ReceiptService,
@@ -229,6 +230,54 @@ class MosaicService {
 			data: formattedReceipt.filter(receipt =>
 				receipt.senderAddress === address &&
 					receipt.type === ReceiptType.Mosaic_Rental_Fee)
+		};
+	};
+
+	/**
+	 * Gets mosaic holder list dataset into Vue component.
+	 * @param {object} pageInfo - page info such as pageNumber, pageSize.
+	 * @param {object} filterValue - search criteria.
+	 * @param {string} hexOrNamespace - hex value or namespace name.
+	 * @returns {object} formatted mosaic holder list.
+	 */
+	static getMosaicHolderList = async (pageInfo, filterValue, hexOrNamespace) => {
+		const mosaicId = await helper.hexOrNamespaceToId(hexOrNamespace, 'mosaic');
+		const mosaicInfo = await this.getMosaic(mosaicId);
+
+		const { pageNumber, pageSize } = pageInfo;
+		const searchCriteria = {
+			pageNumber,
+			pageSize,
+			order: Order.Desc,
+			mosaicId: mosaicId,
+			...filterValue
+		};
+
+		const accountInfos = await AccountService.searchAccounts(searchCriteria);
+
+		const addresses = accountInfos.data.map(accountInfo =>
+			Address.createFromRawAddress(accountInfo.address));
+
+		const accountNames = await NamespaceService.getAccountsNames(addresses);
+
+		return {
+			...accountInfos,
+			data: accountInfos.data.map(account => {
+				const targetMosaic = account.mosaics.find(mosaic => mosaic.id.toHex() === mosaicId.toHex());
+				const balance = targetMosaic 
+					? helper.formatMosaicAmountWithDivisibility(
+						Number(targetMosaic.amount.toString()),
+						mosaicInfo.divisibility
+					)
+					: helper.formatMosaicAmountWithDivisibility(0, mosaicInfo.divisibility);
+
+				return {
+					...account,
+					balance,
+					accountAliasNames: AccountService.extractAccountNamespace(account, accountNames),
+					accountLabel: http.accountLabels[account.address]
+				};
+			})
 		};
 	};
 

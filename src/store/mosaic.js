@@ -75,6 +75,14 @@ const managers = [
 		}
 	}),
 	new Pagination({
+		name: 'holders',
+		fetchFunction: (pageInfo, filterValue, store) =>
+			MosaicService.getMosaicHolderList(pageInfo, filterValue, store.getters.getCurrentMosaicId),
+		pageInfo: {
+			pageSize: 10
+		}
+	}),
+	new Pagination({
 		name: 'transactions',
 		fetchFunction: (pageInfo, filterValue, store) =>
 			MosaicService.getMosaicTransactionList(pageInfo, filterValue, store.getters.getCurrentMosaicId),
@@ -145,6 +153,7 @@ export default {
 			context.getters.metadatas.setStore(context).initialFetch(payload.mosaicId);
 			context.getters.balanceTransferReceipt.setStore(context).initialFetch(payload.mosaicId);
 			context.getters.artifactExpiryReceipt.setStore(context).initialFetch(payload.mosaicId);
+			context.getters.holders.setStore(context).initialFetch(payload.mosaicId);
 			context.getters.transactions.setStore(context).initialFetch(payload.mosaicId);
 		},
 
@@ -154,6 +163,7 @@ export default {
 			context.getters.metadatas.setStore(context).uninitialize();
 			context.getters.balanceTransferReceipt.setStore(context).uninitialize();
 			context.getters.artifactExpiryReceipt.setStore(context).uninitialize();
+			context.getters.holders.setStore(context).uninitialize();
 			context.getters.transactions.setStore(context).uninitialize();
 		}
 	}
