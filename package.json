@@ -84,7 +84,7 @@
     "webpack": "^5.97.1"
   },
   "engines": {
-    "node": ">=20.0",
+    "node": ">=22.0",
     "npm": ">=10"
   },
   "homepage": "https://github.com/nemgrouplimited/symbol-explorer"

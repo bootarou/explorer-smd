@@ -29,7 +29,7 @@ The explorer supports searching for transactions, accounts, namespaces, mosaics,
 
 ## Requirements
 
-- Node.js v20
+- Node.js v22
 
 ## Installation
 
